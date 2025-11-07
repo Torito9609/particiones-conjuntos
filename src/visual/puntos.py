@@ -1,6 +1,5 @@
 from __future__ import annotations
-"""
-Utilidades para dibujar N puntos como vértices de un polígono regular
+"""Utilidades para dibujar N puntos como vértices de un polígono regular
 (triángulo para n=3, cuadrado para n=4, pentágono para n=5, etc.).
 
 Casos especiales: n=1 y n=2 se ubican de forma razonable.
@@ -10,30 +9,14 @@ Funciones principales:
 - auto_radius(n, fig_size=(6,6), margin=0.15)
 - style_axes(ax, margin=0.15)
 - draw_points(ax, positions, labels=True, indices_start=1)
-
-Ejemplo de uso (desde un REPL):
-
->>> import matplotlib.pyplot as plt
->>> from visual.puntos import layout_regular_ngon, draw_points, style_axes
->>> n = 5
->>> pos = layout_regular_ngon(n, radius=1.0, rotation_deg=90)
->>> fig, ax = plt.subplots(figsize=(5,5))
->>> draw_points(ax, pos, labels=True)
->>> style_axes(ax)
->>> plt.show()
 """
 
 import math
-from typing import Iterable, List, Sequence, Tuple
-
+from typing import List, Sequence, Tuple
 import matplotlib.pyplot as plt
 
-__all__ = [
-    "layout_regular_ngon",
-    "auto_radius",
-    "style_axes",
-    "draw_points",
-]
+__all__ = ["layout_regular_ngon", "auto_radius", "style_axes", "draw_points"]
+
 
 Point = Tuple[float, float]
 
@@ -116,55 +99,58 @@ def auto_radius(
     return 1.0 - margin * 0.2
 
 
-def style_axes(ax: plt.Axes, *, margin: float = 0.15) -> None:
-    """Aplica estilo estándar: aspecto igual, sin ejes y límites con margen.
-
-    Args:
-        ax: ejes de Matplotlib.
-        margin: margen relativo para los límites (0..0.4 recomendado).
-    """
+def style_axes(ax, *, margin: float = 0.15, dark: bool = True) -> None:
+    face = "black" if dark else "white"
+    ax.set_facecolor(face)
     ax.set_aspect("equal", adjustable="box")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    # Límites centrados con margen alrededor de [-1, 1]
+    ax.set_xticks([]); ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
     pad = 0.3 + margin
     ax.set_xlim(-1.0 - pad, 1.0 + pad)
     ax.set_ylim(-1.0 - pad, 1.0 + pad)
 
 
+
+
 def draw_points(
-    ax: plt.Axes,
-    positions: Sequence[Point],
+    ax,
+    positions,
     *,
     labels: bool = True,
     indices_start: int = 1,
     point_size: float = 40.0,
-    label_size: float = 10.0,
+    label_size: float = 11.0,
+    point_color: str = "white",
+    label_color: str = "white",
+    label_offset_factor: float = 0.08,
+    center: tuple[float, float] = (0.0, 0.0),
 ) -> dict:
-    """Dibuja puntos (scatter) y, opcionalmente, etiquetas numéricas.
-
-    Args:
-        ax: ejes donde dibujar.
-        positions: lista de (x, y).
-        labels: si True, imprime etiquetas 1..n (o desplazadas por indices_start).
-        indices_start: valor de inicio de las etiquetas (1 por defecto).
-        point_size: tamaño del marcador de puntos (pt^2 de Matplotlib).
-        label_size: tamaño de fuente de las etiquetas.
-
-    Returns:
-        Diccionario con referencias a artists creados: {
-            'scatter': PathCollection,
-            'texts': List[Text],
-        }
-    """
+    """Dibuja puntos y, opcionalmente, etiquetas desplazadas radialmente."""
     xs = [p[0] for p in positions]
     ys = [p[1] for p in positions]
-    sc = ax.scatter(xs, ys, s=point_size, zorder=3)
+    sc = ax.scatter(xs, ys, s=point_size, zorder=3, c=point_color)
 
     texts = []
     if labels:
+        cx, cy = center
+        if positions:
+            r0 = math.hypot(positions[0][0] - cx, positions[0][1] - cy)
+        else:
+            r0 = 1.0
+        dr = label_offset_factor * max(r0, 1e-6)
+
         for i, (x, y) in enumerate(positions, start=indices_start):
-            t = ax.text(x, y, str(i), ha="center", va="center", fontsize=label_size, zorder=4)
+            vx, vy = x - cx, y - cy
+            norm = math.hypot(vx, vy) or 1.0
+            ux, uy = vx / norm, vy / norm
+            lx, ly = x + dr * ux, y + dr * uy
+            t = ax.text(
+                lx, ly, str(i),
+                ha="center", va="center",
+                fontsize=label_size, color=label_color, zorder=4
+            )
             texts.append(t)
 
     return {"scatter": sc, "texts": texts}
+
